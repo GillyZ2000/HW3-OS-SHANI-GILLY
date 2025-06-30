@@ -24,7 +24,7 @@ struct Server_Log {
 };
 // Creates a new server log instance (stub)
 server_log create_log() {
-    Server_Log* log = (Server_Log*)malloc(sizeof(Server_Log));
+    struct Server_Log* log = (struct Server_Log*)malloc(sizeof(struct Server_Log));
     if (log == NULL) return NULL;
     
     // נתחיל עם באפר בגודל התחלתי סביר (נגיד 4KB)
@@ -46,7 +46,7 @@ server_log create_log() {
     log->waiting_writers = 0;
     log->writing = 0;
     
-    return *log;
+    return log;
 }
 
 // Destroys and frees the log (stub)
@@ -103,7 +103,7 @@ void add_to_log(server_log log, const char* data, int data_len) {
     return;
 }
 // מאתחל את מנגנון הסנכרון
-void readers_writers_init(Server_Log* log) {
+void readers_writers_init(server_Log log) {
     pthread_mutex_init(&log->lock, NULL);
     pthread_cond_init(&log->read_cv, NULL);
     pthread_cond_init(&log->write_cv, NULL);
@@ -113,7 +113,7 @@ void readers_writers_init(Server_Log* log) {
 }
 
 // נעילה לקורא - מחכה אם יש כותב או כותבים ממתינים
-void reader_lock(Server_Log* log) {
+void reader_lock(server_Log log) {
     pthread_mutex_lock(&log->lock);
     
     // מחכים אם יש כותב פעיל או כותבים ממתינים (העדפת כותבים)
@@ -126,7 +126,7 @@ void reader_lock(Server_Log* log) {
 }
 
 // שחרור נעילה לקורא
-void reader_unlock(Server_Log* log) {
+void reader_unlock(server_Log log) {
     pthread_mutex_lock(&log->lock);
     
     log->active_readers--;
@@ -140,7 +140,7 @@ void reader_unlock(Server_Log* log) {
 }
 
 // נעילה לכותב - מחכה אם יש קוראים פעילים או כותב אחר
-void writer_lock(Server_Log* log) {
+void writer_lock(server_Log log) {
     pthread_mutex_lock(&log->lock);
     
     log->waiting_writers++;
@@ -157,7 +157,7 @@ void writer_lock(Server_Log* log) {
 }
 
 // שחרור נעילה לכותב
-void writer_unlock(Server_Log* log) {
+void writer_unlock(server_Log log) {
     pthread_mutex_lock(&log->lock);
     
     log->writing = 0;

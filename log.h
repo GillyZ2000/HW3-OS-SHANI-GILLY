@@ -13,8 +13,7 @@
 
 typedef struct Server_Log* server_log;
 
-void writer_unlock(Server_Log* log);
-void writer_lock(Server_Log* log);
+
 // Creates a new server log instance
 server_log create_log();
 
