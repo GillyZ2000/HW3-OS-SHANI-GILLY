@@ -39,7 +39,7 @@ typedef struct request_queue {
 // Global variables
 request_queue* queue;        // The request queue
 pthread_t* threads;         // Array of worker threads
-int num_threads;           // Number of worker threads
+
 
 // Parses command-line arguments
 void getargs(int *port, int *threads, int *queue_size, int argc, char *argv[])
@@ -168,21 +168,21 @@ void destroy_queue(request_queue* queue) {
 int main(int argc, char *argv[])
 {
     int listenfd, connfd, port, clientlen;
-    int threads, queue_size;
+    int num_threads, queue_size;
     struct sockaddr_in clientaddr;
 
     // Create the global server log
     server_log log = create_log();
 
     // Parse arguments
-    getargs(&port, &threads, &queue_size, argc, argv);
+    getargs(&port, &num_threads, &queue_size, argc, argv);
 
     // Initialize the request queue and thread pool
     queue = init_queue(queue_size);
-    init_thread_pool(threads);
+    init_thread_pool(num_threads);
 
     // Create worker threads
-    for (int i = 0; i < threads; i++) {
+    for (int i = 0; i < num_threads; i++) {
         int* thread_id = malloc(sizeof(int));
         *thread_id = i + 1;  // Thread IDs start from 1 as per requirements
         pthread_create(&threads[i], NULL, worker_thread, thread_id);
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
     }
 
     // Cleanup code
-    for (int i = 0; i < threads; i++) {
+    for (int i = 0; i < num_threads; i++) {
         pthread_cancel(threads[i]);  // Cancel all worker threads
         pthread_join(threads[i], NULL);  // Wait for them to finish
     }
