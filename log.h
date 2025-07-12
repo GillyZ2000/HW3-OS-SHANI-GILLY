@@ -1,3 +1,26 @@
+
+2 of 794
+Fwd: hw3 1
+Inbox
+
+koren shani <fuog56@gmail.com>
+Attachments
+2:46 PM (3 hours ago)
+to me
+
+
+
+---------- Forwarded message ---------
+מאת: koren shani <fuog56@gmail.com>
+‪Date: שבת, 12 ביולי 2025 ב-14:44‬
+Subject: hw3 1
+To: koren shani <fuog56@gmail.com>
+
+
+
+
+ 21 Attachments
+  •  Scanned by Gmail
 #ifndef SERVER_LOG_H
 #define SERVER_LOG_H
 
