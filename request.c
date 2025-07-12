@@ -1,3 +1,4 @@
+
 //
 // request.c: Does the bulk of the work for the web server.
 // 
@@ -186,7 +187,7 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
     add_to_log(srv_log, log_entry, strlen(log_entry));
 }
 
-void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log log)
+void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log srv_log)
 {
     char header[MAXBUF], *body = NULL;
     int body_len = get_log(srv_log, &body);
@@ -248,7 +249,7 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
             t_stats->total_req++;
             char log_entry[MAXLINE * 2] = {0};
             append_stats(log_entry, t_stats, arrival, dispatch);
-            add_to_log(srv_log, log_entry, strlen(log_entry));
+            add_to_log(log, log_entry, strlen(log_entry));
 
         } else {
             if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
@@ -273,3 +274,4 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
 }
+
