@@ -1,10 +1,133 @@
-
-#include <stdlib.h>
-#include <string.h>
+#include "segel.h"
+#include "request.h"
 #include "log.h"
-#include <pthread.h>
 
+//
+// server.c: A very, very simple web server
+//
+// To run:
+//  ./server <portnum (above 2000)>
+//
+// Repeatedly handles HTTP requests sent to this port number.
+// Most of the work is done within routines written in request.c
+//
 
+// Structure for request statistics
+typedef struct stats {
+    struct timeval arrival;    // Stat-req-arrival: arrival time
+    struct timeval dispatch;   // For calculating dispatch interval
+} stats_t;
+
+// Structure for a request in the queue
+typedef struct request_t {
+    int connfd;               // Connection file descriptor
+    stats_t stats;           // Request timing statistics
+} request_t;
+
+// Structure for the request queue
+typedef struct request_queue {
+    request_t* requests;      // Array of requests
+    int queue_size;          // Maximum size from command line argument
+    int count;               // Current number of requests in queue
+    int front;               // Index for the first request
+    int rear;               // Index for the last request
+    pthread_mutex_t mutex;   // Mutex for queue synchronization
+    pthread_cond_t not_empty;// Condition for queue not empty
+    pthread_cond_t not_full; // Condition for queue not full
+} request_queue;
+
+// Global variables
+request_queue* queue;        // The request queue
+pthread_t* threads;         // Array of worker threads
+server_log srv_log;
+
+// Parses command-line arguments
+void getargs(int *port, int *threads, int *queue_size, int argc, char *argv[])
+{
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s <port> <threads> <queue_size>\n", argv[0]);
+        exit(1);
+    }
+    *port = atoi(argv[1]);
+    *threads = atoi(argv[2]);
+    *queue_size = atoi(argv[3]);
+    
+    // Validate arguments
+    if (*threads <= 0 || *queue_size <= 0) {
+        fprintf(stderr, "threads and queue_size must be positive integers\n");
+        exit(1);
+    }
+}
+// TODO: HW3 — Initialize thread pool and request queue
+// This server currently handles all requests in the main thread.
+// You must implement a thread pool (fixed number of worker threads)
+// that process requests from a synchronized queue.
+
+// Initialize the request queue
+request_queue* init_queue(int queue_size) {
+    request_queue* queue = (request_queue*)malloc(sizeof(request_queue));
+    if (queue == NULL) {
+        fprintf(stderr, "Failed to allocate queue\n");
+        exit(1);
+    }
+
+    queue->requests = (request_t*)malloc(queue_size * sizeof(request_t));
+    if (queue->requests == NULL) {
+        fprintf(stderr, "Failed to allocate requests array\n");
+        free(queue);
+        exit(1);
+    }
+
+    queue->queue_size = queue_size;
+    queue->count = 0;
+    queue->front = 0;
+    queue->rear = 0;
+
+    // Initialize synchronization primitives
+    pthread_mutex_init(&queue->mutex, NULL);
+    pthread_cond_init(&queue->not_empty, NULL);
+    pthread_cond_init(&queue->not_full, NULL);
+
+    return queue;
+}
+
+// Initialize the thread pool
+void init_thread_pool(int num_threads) {
+    threads = (pthread_t*)malloc(num_threads * sizeof(pthread_t));
+    if (threads == NULL) {
+        fprintf(stderr, "Failed to allocate thread pool\n");
+        exit(1);
+    }
+    num_threads = num_threads;  // Set global variable
+}
+
+void* worker_thread(void* arg) {
+    int thread_id = ((int)arg);
+    free(arg);
+
+    while (1) {
+        pthread_mutex_lock(&queue->mutex);
+
+        // Wait while queue is empty
+        while (queue->count == 0) {
+            pthread_cond_wait(&queue->not_empty, &queue->mutex);
+        }
+
+        // Get the request from the front of the queue
+        request_t request = queue->requests[queue->front];
+        queue->front = (queue->front + 1) % queue->queue_size;
+        queue->count--;
+
+        // Signal that the queue is not full anymore
+        pthread_cond_signal(&queue->not_full);
+
+        pthread_mutex_unlock(&queue->mutex);
+
+        // Process the request
+        process_request(request.connfd);
+    }
+    return NULL;
+}
 
 // Opaque struct definition
 struct Server_Log {
@@ -75,7 +198,7 @@ int get_log(server_log log, char** dst) {
 
     const char* dummy = "Log is not implemented.\n";
     int len = strlen(dummy);
-    *dst = (char*)malloc(len + 1); // Allocate for caller
+    dst = (char)malloc(len + 1); // Allocate for caller
     if (*dst != NULL) {
         strcpy(*dst, dummy);
     }
@@ -174,4 +297,3 @@ void writer_unlock(server_log log) {
     
     pthread_mutex_unlock(&log->lock);
 }
-

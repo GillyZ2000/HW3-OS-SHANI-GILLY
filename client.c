@@ -17,6 +17,7 @@
 
 #include "segel.h"
 
+
 // Sends an HTTP request to the server using the given socket
 void clientSend(int fd, char *filename, char* method)
 {
@@ -29,8 +30,6 @@ void clientSend(int fd, char *filename, char* method)
     sprintf(buf, "%s %s HTTP/1.1\n", method, filename);
     sprintf(buf, "%shost: %s\n\r\n", buf, hostname);
 
-    printf("Request:\n%s\n", buf); // Display the request for debugging
-
     // Send the request to the server
     Rio_writen(fd, buf, strlen(buf));
 }
@@ -42,6 +41,7 @@ void clientPrint(int fd)
     char buf[MAXBUF];
     int length = 0;
     int n;
+    int firstHeader = 1;
 
     // Initialize buffered input
     Rio_readinitb(&rio, fd);
@@ -49,7 +49,12 @@ void clientPrint(int fd)
     // --- Read and print HTTP headers ---
     n = Rio_readlineb(&rio, buf, MAXBUF);
     while (strcmp(buf, "\r\n") && (n > 0)) {
-        printf("Header: %s", buf);
+        if (firstHeader) {
+            printf("sentHeader: %s", buf);
+            firstHeader = 0;
+        } else {
+            printf("Header: %s", buf);
+        }
 
         // Try to parse Content-Length header
         if (sscanf(buf, "Content-Length: %d ", &length) == 1) {
