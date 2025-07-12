@@ -1,3 +1,4 @@
+
 #include "segel.h"
 #include "request.h"
 #include "log.h"
@@ -39,7 +40,7 @@ typedef struct request_queue {
 // Global variables
 request_queue* queue;        // The request queue
 pthread_t* threads;         // Array of worker threads
-
+server_log srv_log;
 
 // Parses command-line arguments
 void getargs(int *port, int *threads, int *queue_size, int argc, char *argv[])
@@ -139,7 +140,7 @@ void* worker_thread(void* arg) {
         t->stat_req = 0;
         t->dynm_req = 0;
 
-        requestHandle(request.connfd, request.stats.arrival, dispatch, t, log);
+        requestHandle(request.connfd, request.stats.arrival, dispatch, t, srv_log);
 
         Close(request.connfd);
         free(t);
@@ -238,3 +239,4 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
