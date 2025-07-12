@@ -1,3 +1,4 @@
+
 #include <stdlib.h>
 #include <string.h>
 #include "log.h"
@@ -103,7 +104,7 @@ void add_to_log(server_log log, const char* data, int data_len) {
     return;
 }
 // מאתחל את מנגנון הסנכרון
-void readers_writers_init(server_Log log) {
+void readers_writers_init(server_log log) {
     pthread_mutex_init(&log->lock, NULL);
     pthread_cond_init(&log->read_cv, NULL);
     pthread_cond_init(&log->write_cv, NULL);
@@ -113,7 +114,7 @@ void readers_writers_init(server_Log log) {
 }
 
 // נעילה לקורא - מחכה אם יש כותב או כותבים ממתינים
-void reader_lock(server_Log log) {
+void reader_lock(server_log log) {
     pthread_mutex_lock(&log->lock);
     
     // מחכים אם יש כותב פעיל או כותבים ממתינים (העדפת כותבים)
@@ -126,7 +127,7 @@ void reader_lock(server_Log log) {
 }
 
 // שחרור נעילה לקורא
-void reader_unlock(server_Log log) {
+void reader_unlock(server_log log) {
     pthread_mutex_lock(&log->lock);
     
     log->active_readers--;
@@ -140,7 +141,7 @@ void reader_unlock(server_Log log) {
 }
 
 // נעילה לכותב - מחכה אם יש קוראים פעילים או כותב אחר
-void writer_lock(server_Log log) {
+void writer_lock(server_log log) {
     pthread_mutex_lock(&log->lock);
     
     log->waiting_writers++;
@@ -157,7 +158,7 @@ void writer_lock(server_Log log) {
 }
 
 // שחרור נעילה לכותב
-void writer_unlock(server_Log log) {
+void writer_unlock(server_log log) {
     pthread_mutex_lock(&log->lock);
     
     log->writing = 0;
@@ -173,3 +174,4 @@ void writer_unlock(server_Log log) {
     
     pthread_mutex_unlock(&log->lock);
 }
+
