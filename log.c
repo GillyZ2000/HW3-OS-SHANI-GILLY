@@ -3,7 +3,7 @@
 #include <string.h>
 #include "log.h"
 #include <pthread.h>
-#include <unistd.h>
+
 
 
 
@@ -109,7 +109,6 @@ void add_to_log(server_log log, const char* data, int data_len) {
     log->buffer[log->size++] = '\n';                   // delimiter
     log->buffer[log->size]   = '\0';                   // keep it null-terminated
 
-    usleep(200000);
 
     writer_unlock(log);
     return;
