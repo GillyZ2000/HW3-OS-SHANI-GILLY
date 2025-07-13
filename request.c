@@ -1,4 +1,3 @@
-
 //
 // request.c: Does the bulk of the work for the web server.
 // 
@@ -274,4 +273,3 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
 }
-
