@@ -185,7 +185,7 @@ int main(int argc, char *argv[])
     // Create worker threads
     for (int i = 0; i < num_threads; i++) {
         int* thread_id = malloc(sizeof(int));
-        *thread_id = i + 1;  // Thread IDs start from 1 as per requirements
+        *thread_id = i;  
         pthread_create(&threads[i], NULL, worker_thread, thread_id);
     }
 
