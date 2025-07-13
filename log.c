@@ -37,6 +37,7 @@ server_log create_log() {
         return NULL;
     }
     log->size = 0;
+    log->buffer[0] = '\0';
     
     // אתחול משתני הסנכרון
     pthread_mutex_init(&log->lock, NULL);
@@ -70,35 +71,46 @@ void destroy_log(server_log log) {
 }
 
 // Returns dummy log content as string (stub)
-int get_log(server_log log, char **dst)
-{
-    reader_lock(log);               /* writer-priority RW-lock */
+int get_log(server_log log, char** dst) {
+    reader_lock(log);
+
     int len = log->size;
-    *dst = malloc(len + 1);
-    memcpy(*dst, log->buffer, len);
-    (*dst)[len] = '\0';
+    char *out = malloc(len + 1);
+    if (!out) {
+        reader_unlock(log);
+        return 0;
+    }
+    memcpy(out, log->buffer, len);
     reader_unlock(log);
+
+    /* if the buffer ends with two '\n's in a row, the last one is our delimiter: drop it */
+    if (len >= 2 && out[len-1] == '\n' && out[len-2] == '\n') {
+        len -= 1;
+    }
+    out[len] = '\0';
+
+    *dst = out;
     return len;
 }
 
 // Appends a new entry to the log (no-op stub)
 void add_to_log(server_log log, const char* data, int data_len) {
     writer_lock(log);
-    data_len++;
-    // בדיקה אם יש מקום בבאפר
-    if (log->size + data_len > log->capacity) {
-        // מגדיל את הבאפר
-        log->capacity *= 2;
-        log->buffer = (char*)realloc(log->buffer, log->capacity);
-    }
-
-    // מעתיק את הנתונים לבאפר
+    /* append the raw stats block */
     memcpy(log->buffer + log->size, data, data_len);
     log->size += data_len;
 
-    // מעדכן את הבאפר
-    log->buffer[log->size] = '\0';
+    /* add exactly one '\n' as the delimiter between entries */
+    if (log->size + 2 > log->capacity) {               // need space for '\n' + '\0'
+        while (log->size + 2 > log->capacity)
+            log->capacity *= 2;
+        log->buffer = realloc(log->buffer, log->capacity);
+    }
+    log->buffer[log->size++] = '\n';                   // delimiter
+    log->buffer[log->size]   = '\0';                   // keep it null-terminated
+
     usleep(200000);
+
     writer_unlock(log);
     return;
 }

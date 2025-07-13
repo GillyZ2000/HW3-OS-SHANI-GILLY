@@ -43,6 +43,7 @@ pthread_t* threads;         // Array of worker threads
 server_log srv_log;
 int num_threads;
 threads_stats* threadsStats = NULL;
+int active_count = 0;
 
 // Parses command-line arguments
 void getargs(int *port, int *threads, int *queue_size, int argc, char *argv[])
@@ -126,8 +127,8 @@ void* worker_thread(void* arg) {
 
         // **immediately** decrement count and signal master
         queue->count--;
+        active_count++;
         pthread_cond_signal(&queue->not_full);
-
         pthread_mutex_unlock(&queue->mutex);
         // ——————————————————————————————————————————
 
@@ -146,7 +147,10 @@ void* worker_thread(void* arg) {
         requestHandle(request.connfd, request.stats.arrival, dispatch, t_stats, srv_log);
         Close(request.connfd);
 
-
+         pthread_mutex_lock(&queue->mutex);
+         active_count--;
+         pthread_cond_signal(&queue->not_full);
+         pthread_mutex_unlock(&queue->mutex);
 
     }
 
@@ -213,20 +217,17 @@ int main(int argc, char *argv[])
 
     while (1) {
         clientlen = sizeof(clientaddr);
-        connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
+        pthread_mutex_lock(&queue->mutex);
+        while (queue->count + active_count >= queue->queue_size) {
+            pthread_cond_wait(&queue->not_full, &queue->mutex);
+        }
+        pthread_mutex_unlock(&queue->mutex);
+        connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *)&clientlen);
 
         // Get arrival time
         struct timeval arrival;
         gettimeofday(&arrival, NULL);
-
-        // Lock the queue
         pthread_mutex_lock(&queue->mutex);
-
-        // Wait if queue is full
-        while (queue->count >= queue->queue_size) {
-            pthread_cond_wait(&queue->not_full, &queue->mutex);
-        }
-
         // Add request to queue
         request_t new_request;
         new_request.connfd = connfd;
