@@ -41,6 +41,7 @@ typedef struct request_queue {
 request_queue* queue;        // The request queue
 pthread_t* threads;         // Array of worker threads
 server_log srv_log;
+int num_threads;
 
 // Parses command-line arguments
 void getargs(int *port, int *threads, int *queue_size, int argc, char *argv[])
@@ -128,11 +129,17 @@ void* worker_thread(void* arg) {
         }
 
         // Get current time for dispatch statistics
-        struct timeval dispatch;
-        gettimeofday(&dispatch, NULL);
+        struct timeval dispatch_raw, dispatch;
+        gettimeofday(&dispatch_raw, NULL);
 
         pthread_mutex_unlock(&queue->mutex);
 
+        dispatch.tv_sec  = dispatch_raw.tv_sec  - request.stats.arrival.tv_sec;
+        dispatch.tv_usec = dispatch_raw.tv_usec - request.stats.arrival.tv_usec;
+        if (dispatch.tv_usec < 0) {
+            dispatch.tv_usec += 1000000;
+            dispatch.tv_sec -= 1;
+        }
         // Handle request...
         threads_stats t = malloc(sizeof(struct Threads_stats));
         t->id = thread_id;
@@ -169,11 +176,12 @@ void destroy_queue(request_queue* queue) {
 int main(int argc, char *argv[])
 {
     int listenfd, connfd, port, clientlen;
-    int num_threads, queue_size;
+    int queue_size;
     struct sockaddr_in clientaddr;
 
     // Create the global server log
     server_log log = create_log();
+    srv_log = log;
 
     // Parse arguments
     getargs(&port, &num_threads, &queue_size, argc, argv);

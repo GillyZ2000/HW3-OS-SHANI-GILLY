@@ -84,7 +84,7 @@ int get_log(server_log log, char** dst) {
 
 // Appends a new entry to the log (no-op stub)
 void add_to_log(server_log log, const char* data, int data_len) {
-    writer_lock(&log);
+    writer_lock(log);
     data_len++;
     // בדיקה אם יש מקום בבאפר
     if (log->size + data_len > log->capacity) {
@@ -100,7 +100,7 @@ void add_to_log(server_log log, const char* data, int data_len) {
     // מעדכן את הבאפר
     log->buffer[log->size] = '\0';
 
-    writer_unlock(&log);
+    writer_unlock(log);
     return;
 }
 // מאתחל את מנגנון הסנכרון

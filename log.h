@@ -28,4 +28,8 @@ int get_log(server_log log, char** dst);
 // Appends a new entry to the log
 void add_to_log(server_log log, const char* data, int data_len);
 
+void writer_lock(server_log log);
+
+void writer_unlock(server_log log);
+
 #endif // SERVER_LOG_H
