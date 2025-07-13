@@ -42,6 +42,7 @@ request_queue* queue;        // The request queue
 pthread_t* threads;         // Array of worker threads
 server_log srv_log;
 int num_threads;
+threads_stats* threadsStats = NULL;
 
 // Parses command-line arguments
 void getargs(int *port, int *threads, int *queue_size, int argc, char *argv[])
@@ -101,59 +102,59 @@ void init_thread_pool(int num_threads) {
         exit(1);
     }
     num_threads = num_threads;  // Set global variable
+
 }
 
 void* worker_thread(void* arg) {
     int thread_id = *((int*)arg);
     free(arg);
 
-    while (1) {
+
+    threads_stats t_stats = threadsStats[thread_id - 1];
+     while (1) {
+        // ——— dequeue under lock ————————————————
         pthread_mutex_lock(&queue->mutex);
 
-        // Wait while queue is empty
+        // wait for something in the queue
         while (queue->count == 0) {
             pthread_cond_wait(&queue->not_empty, &queue->mutex);
         }
 
-        // Get the request from the front of the queue
+        // pull the front request
         request_t request = queue->requests[queue->front];
         queue->front = (queue->front + 1) % queue->queue_size;
+
+        // **immediately** decrement count and signal master
         queue->count--;
-
-        // Signal that the queue is not full anymore
         pthread_cond_signal(&queue->not_full);
-        
-        // If there are still items in queue, wake up another worker
-        if (queue->count > 0) {
-            pthread_cond_broadcast(&queue->not_empty);
-        }
-
-        // Get current time for dispatch statistics
-        struct timeval dispatch_raw, dispatch;
-        gettimeofday(&dispatch_raw, NULL);
 
         pthread_mutex_unlock(&queue->mutex);
+        // ——————————————————————————————————————————
 
-        dispatch.tv_sec  = dispatch_raw.tv_sec  - request.stats.arrival.tv_sec;
-        dispatch.tv_usec = dispatch_raw.tv_usec - request.stats.arrival.tv_usec;
+        // compute dispatch interval
+        struct timeval now, dispatch;
+        gettimeofday(&now, NULL);
+        dispatch.tv_sec  = now.tv_sec  - request.stats.arrival.tv_sec;
+        dispatch.tv_usec = now.tv_usec - request.stats.arrival.tv_usec;
         if (dispatch.tv_usec < 0) {
             dispatch.tv_usec += 1000000;
-            dispatch.tv_sec -= 1;
+            dispatch.tv_sec  -= 1;
         }
-        // Handle request...
-        threads_stats t = malloc(sizeof(struct Threads_stats));
-        t->id = thread_id;
-        t->total_req = 0;
-        t->stat_req = 0;
-        t->dynm_req = 0;
 
-        requestHandle(request.connfd, request.stats.arrival, dispatch, t, srv_log);
+        // do the actual work
 
+        requestHandle(request.connfd, request.stats.arrival, dispatch, t_stats, srv_log);
         Close(request.connfd);
-        free(t);
+
+
+
     }
+
     return NULL;
 }
+
+
+
 
 // Cleanup function for the request queue
 void destroy_queue(request_queue* queue) {
@@ -179,6 +180,7 @@ int main(int argc, char *argv[])
     int queue_size;
     struct sockaddr_in clientaddr;
 
+
     // Create the global server log
     server_log log = create_log();
     srv_log = log;
@@ -191,11 +193,21 @@ int main(int argc, char *argv[])
     init_thread_pool(num_threads);
 
     // Create worker threads
-    for (int i = 0; i < num_threads; i++) {
-        int* thread_id = malloc(sizeof(int));
-        *thread_id = i+1;  
-        pthread_create(&threads[i], NULL, worker_thread, thread_id);
-    }
+        threadsStats = malloc(num_threads * sizeof(threads_stats));
+        for (int i = 0; i < num_threads; i++) {
+                // allocate and zero-initialize per-thread stats
+                threadsStats[i] = malloc(sizeof(struct Threads_stats));
+                threadsStats[i]->id        = i + 1;
+                threadsStats[i]->stat_req  = 0;
+                threadsStats[i]->dynm_req  = 0;
+                threadsStats[i]->post_req  = 0;
+                threadsStats[i]->total_req = 0;
+
+
+                int* thread_id_arg = malloc(sizeof(int));
+                *thread_id_arg = i + 1;
+                pthread_create(&threads[i], NULL, worker_thread, thread_id_arg);
+            }
 
     listenfd = Open_listenfd(port);
 

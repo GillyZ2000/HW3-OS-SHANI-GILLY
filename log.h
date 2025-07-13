@@ -32,4 +32,9 @@ void writer_lock(server_log log);
 
 void writer_unlock(server_log log);
 
+void reader_lock(server_log log);
+
+void reader_unlock(server_log log);
+
+
 #endif // SERVER_LOG_H

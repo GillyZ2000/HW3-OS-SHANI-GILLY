@@ -3,6 +3,7 @@
 #include <string.h>
 #include "log.h"
 #include <pthread.h>
+#include <unistd.h>
 
 
 
@@ -69,16 +70,14 @@ void destroy_log(server_log log) {
 }
 
 // Returns dummy log content as string (stub)
-int get_log(server_log log, char** dst) {
-    // TODO: Return the full contents of the log as a dynamically allocated string
-    // This function should handle concurrent access
-
-    const char* dummy = "Log is not implemented.\n";
-    int len = strlen(dummy);
-    *dst = (char*)malloc(len + 1); // Allocate for caller
-    if (*dst != NULL) {
-        strcpy(*dst, dummy);
-    }
+int get_log(server_log log, char **dst)
+{
+    reader_lock(log);               /* writer-priority RW-lock */
+    int len = log->size;
+    *dst = malloc(len + 1);
+    memcpy(*dst, log->buffer, len);
+    (*dst)[len] = '\0';
+    reader_unlock(log);
     return len;
 }
 
@@ -99,7 +98,7 @@ void add_to_log(server_log log, const char* data, int data_len) {
 
     // מעדכן את הבאפר
     log->buffer[log->size] = '\0';
-
+    usleep(200000);
     writer_unlock(log);
     return;
 }

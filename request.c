@@ -126,6 +126,10 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval a
 {
 	char buf[MAXLINE], *emptylist[] = {NULL};
 
+    t_stats->dynm_req++;
+    t_stats->total_req++;
+    char log_entry[MAXLINE * 2] = {0};
+    append_stats(log_entry, t_stats, arrival, dispatch);
 	// The server does only a little bit of the header.
 	// The CGI script has to finish writing out the header.
 	sprintf(buf, "HTTP/1.0 200 OK\r\n");
@@ -143,46 +147,41 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval a
    	}
   	WaitPid(pid, NULL, WUNTRACED);
 
-    t_stats->dynm_req++;
-    t_stats->total_req++;
-
-    char log_entry[MAXLINE * 2] = {0};
-    append_stats(log_entry, t_stats, arrival, dispatch);
-    add_to_log(srv_log, log_entry, strlen(log_entry));
+   add_to_log(srv_log, log_entry, strlen(log_entry));
 }
 
 
-void requestServeStatic(int fd, char *filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log srv_log)
-{
-	int srcfd;
-	char *srcp, filetype[MAXLINE], buf[MAXBUF];
-
-	requestGetFiletype(filename, filetype);
-
-	srcfd = Open(filename, O_RDONLY, 0);
-
-	// Rather than call read() to read the file into memory,
-	// which would require that we allocate a buffer, we memory-map the file
-	srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
-	Close(srcfd);
-
-	// put together response
-	sprintf(buf, "HTTP/1.0 200 OK\r\n");
-	sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
-	sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
-	sprintf(buf, "%sContent-Type: %s\r\n", buf, filetype);
-    int buf_len = append_stats(buf, t_stats, arrival, dispatch);
-    Rio_writen(fd, buf, buf_len);
-
-	//  Writes out to the client socket the memory-mapped file
-	Rio_writen(fd, srcp, filesize);
-	Munmap(srcp, filesize);
-
+void requestServeStatic(int fd, char *filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log srv_log) {
+    int srcfd;
+    char *srcp, filetype[MAXLINE], buf[MAXBUF];
     t_stats->stat_req++;
     t_stats->total_req++;
 
     char log_entry[MAXLINE * 2] = {0};
     append_stats(log_entry, t_stats, arrival, dispatch);
+
+    requestGetFiletype(filename, filetype);
+
+    srcfd = Open(filename, O_RDONLY, 0);
+
+    // Rather than call read() to read the file into memory,
+    // which would require that we allocate a buffer, we memory-map the file
+    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+    Close(srcfd);
+
+    // put together response
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");
+    sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
+    sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
+    sprintf(buf, "%sContent-Type: %s\r\n", buf, filetype);
+    int buf_len = append_stats(buf, t_stats, arrival, dispatch);
+    Rio_writen(fd, buf, buf_len);
+
+    //  Writes out to the client socket the memory-mapped file
+    Rio_writen(fd, srcp, filesize);
+    Munmap(srcp, filesize);
+
+
     add_to_log(srv_log, log_entry, strlen(log_entry));
 }
 
@@ -190,6 +189,10 @@ void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, 
 {
     char header[MAXBUF], *body = NULL;
     int body_len = get_log(srv_log, &body);
+    t_stats->post_req++;
+    t_stats->total_req++;
+    char log_entry[MAXLINE * 2] = {0};
+    append_stats(log_entry, t_stats, arrival, dispatch);
     // put together response
     sprintf(header, "HTTP/1.0 200 OK\r\n");
     sprintf(header, "%sServer: OS-HW3 Web Server\r\n", header);
@@ -200,12 +203,8 @@ void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, 
     Rio_writen(fd, body, body_len);
     free(body);
 
-    t_stats->post_req++;
-    t_stats->total_req++;
 
-    char log_entry[MAXLINE * 2] = {0};
-    append_stats(log_entry, t_stats, arrival, dispatch);
-    add_to_log(srv_log, log_entry, strlen(log_entry));
+//    add_to_log(srv_log, log_entry, strlen(log_entry));
 }
 
 // handle a request
@@ -244,11 +243,6 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
             }
 
             requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats, log);
-            t_stats->stat_req++;
-            t_stats->total_req++;
-            char log_entry[MAXLINE * 2] = {0};
-            append_stats(log_entry, t_stats, arrival, dispatch);
-            add_to_log(log, log_entry, strlen(log_entry));
 
         } else {
             if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
@@ -262,6 +256,7 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
             requestServeDynamic(fd, filename, cgiargs, arrival, dispatch, t_stats, log);
         }
 
+
     } else if (!strcasecmp(method, "POST")) {
         requestServePost(fd, arrival, dispatch, t_stats, log);
 
@@ -272,4 +267,6 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         t_stats->total_req++;
         return;
     }
+
+
 }
